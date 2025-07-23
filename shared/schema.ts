@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -105,3 +106,23 @@ export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// Relations
+export const citizensRelations = relations(citizens, ({ many }) => ({
+  services: many(services),
+  notifications: many(notifications),
+}));
+
+export const servicesRelations = relations(services, ({ one }) => ({
+  citizen: one(citizens, {
+    fields: [services.citizenId],
+    references: [citizens.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  citizen: one(citizens, {
+    fields: [notifications.citizenId],
+    references: [citizens.id],
+  }),
+}));

@@ -6,6 +6,8 @@ import {
   type Announcement, type InsertAnnouncement,
   type Notification, type InsertNotification
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, and, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Citizens
@@ -379,4 +381,167 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  async getCitizen(id: number): Promise<Citizen | undefined> {
+    const [citizen] = await db.select().from(citizens).where(eq(citizens.id, id));
+    return citizen || undefined;
+  }
+
+  async getCitizenByThaiId(thaiId: string): Promise<Citizen | undefined> {
+    const [citizen] = await db.select().from(citizens).where(eq(citizens.thaiId, thaiId));
+    return citizen || undefined;
+  }
+
+  async createCitizen(insertCitizen: InsertCitizen): Promise<Citizen> {
+    const [citizen] = await db
+      .insert(citizens)
+      .values(insertCitizen)
+      .returning();
+    return citizen;
+  }
+
+  async updateCitizen(id: number, updates: Partial<Citizen>): Promise<Citizen | undefined> {
+    const [citizen] = await db
+      .update(citizens)
+      .set(updates)
+      .where(eq(citizens.id, id))
+      .returning();
+    return citizen || undefined;
+  }
+
+  async getService(id: number): Promise<Service | undefined> {
+    const [service] = await db.select().from(services).where(eq(services.id, id));
+    return service || undefined;
+  }
+
+  async getServicesByCitizen(citizenId: number): Promise<Service[]> {
+    return await db
+      .select()
+      .from(services)
+      .where(eq(services.citizenId, citizenId))
+      .orderBy(desc(services.createdAt));
+  }
+
+  async getServiceByTrackingId(trackingId: string): Promise<Service | undefined> {
+    const [service] = await db.select().from(services).where(eq(services.trackingId, trackingId));
+    return service || undefined;
+  }
+
+  async createService(insertService: InsertService): Promise<Service> {
+    // Generate tracking ID
+    const trackingId = `${insertService.serviceType.toUpperCase()}-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+    
+    const [service] = await db
+      .insert(services)
+      .values({
+        ...insertService,
+        trackingId,
+      })
+      .returning();
+    return service;
+  }
+
+  async updateService(id: number, updates: Partial<Service>): Promise<Service | undefined> {
+    const [service] = await db
+      .update(services)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(services.id, id))
+      .returning();
+    return service || undefined;
+  }
+
+  async getServiceStats(): Promise<Record<string, number>> {
+    const stats = await db
+      .select({
+        serviceType: services.serviceType,
+        count: sql<number>`count(*)`,
+      })
+      .from(services)
+      .groupBy(services.serviceType);
+
+    const total = await db.select({ count: sql<number>`count(*)` }).from(services);
+    
+    const result: Record<string, number> = { total: total[0]?.count || 0 };
+    stats.forEach(stat => {
+      result[stat.serviceType] = stat.count;
+    });
+    
+    return result;
+  }
+
+  async getReports(category?: string, year?: number): Promise<Report[]> {
+    let query = db.select().from(reports);
+    
+    if (category && year) {
+      query = query.where(and(eq(reports.category, category), eq(reports.year, year)));
+    } else if (category) {
+      query = query.where(eq(reports.category, category));
+    } else if (year) {
+      query = query.where(eq(reports.year, year));
+    }
+    
+    return await query.orderBy(desc(reports.createdAt));
+  }
+
+  async createReport(insertReport: InsertReport): Promise<Report> {
+    const [report] = await db
+      .insert(reports)
+      .values(insertReport)
+      .returning();
+    return report;
+  }
+
+  async getAnnouncements(category?: string, limit?: number): Promise<Announcement[]> {
+    let query = db.select().from(announcements).where(eq(announcements.isActive, true));
+    
+    if (category) {
+      query = query.where(and(eq(announcements.isActive, true), eq(announcements.category, category)));
+    }
+    
+    query = query.orderBy(desc(announcements.publishedAt));
+    
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    return await query;
+  }
+
+  async getAnnouncement(id: number): Promise<Announcement | undefined> {
+    const [announcement] = await db.select().from(announcements).where(eq(announcements.id, id));
+    return announcement || undefined;
+  }
+
+  async createAnnouncement(insertAnnouncement: InsertAnnouncement): Promise<Announcement> {
+    const [announcement] = await db
+      .insert(announcements)
+      .values(insertAnnouncement)
+      .returning();
+    return announcement;
+  }
+
+  async getNotificationsByCitizen(citizenId: number): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.citizenId, citizenId))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    const [notification] = await db
+      .insert(notifications)
+      .values(insertNotification)
+      .returning();
+    return notification;
+  }
+
+  async markNotificationAsRead(id: number): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.id, id));
+  }
+}
+
+export const storage = new DatabaseStorage();
