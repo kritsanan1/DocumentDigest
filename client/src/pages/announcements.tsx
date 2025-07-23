@@ -16,7 +16,7 @@ export default function Announcements() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [bookmarkedIds, setBookmarkedIds] = useState<number[]>([]);
 
-  const { data: announcements } = useQuery({
+  const { data: announcements } = useQuery<any[]>({
     queryKey: ["/api/announcements", selectedCategory !== "all" ? selectedCategory : undefined],
   });
 

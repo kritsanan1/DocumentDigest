@@ -222,6 +222,9 @@ export class MemStorage implements IStorage {
     const citizen: Citizen = {
       ...insertCitizen,
       id,
+      email: insertCitizen.email || null,
+      isVerified: insertCitizen.isVerified || false,
+      biometricEnabled: insertCitizen.biometricEnabled || false,
       createdAt: new Date(),
     };
     this.citizens.set(id, citizen);
@@ -245,7 +248,7 @@ export class MemStorage implements IStorage {
   async getServicesByCitizen(citizenId: number): Promise<Service[]> {
     return Array.from(this.services.values())
       .filter(service => service.citizenId === citizenId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 
   async getServiceByTrackingId(trackingId: string): Promise<Service | undefined> {
@@ -259,6 +262,11 @@ export class MemStorage implements IStorage {
       ...insertService,
       id,
       trackingId,
+      description: insertService.description || null,
+      status: insertService.status || "pending",
+      citizenId: insertService.citizenId || null,
+      amount: insertService.amount || null,
+      documentUrls: insertService.documentUrls || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -293,7 +301,7 @@ export class MemStorage implements IStorage {
   async getReports(category?: string, year?: number): Promise<Report[]> {
     return Array.from(this.reports.values())
       .filter(report => (!category || report.category === category) && (!year || report.year === year))
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 
   async createReport(insertReport: InsertReport): Promise<Report> {
@@ -301,6 +309,7 @@ export class MemStorage implements IStorage {
     const report: Report = {
       ...insertReport,
       id,
+      month: insertReport.month || null,
       createdAt: new Date(),
     };
     this.reports.set(id, report);
@@ -311,7 +320,7 @@ export class MemStorage implements IStorage {
   async getAnnouncements(category?: string, limit?: number): Promise<Announcement[]> {
     let announcements = Array.from(this.announcements.values())
       .filter(announcement => announcement.isActive && (!category || announcement.category === category))
-      .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+      .sort((a, b) => (b.publishedAt?.getTime() || 0) - (a.publishedAt?.getTime() || 0));
 
     if (limit) {
       announcements = announcements.slice(0, limit);
@@ -329,6 +338,11 @@ export class MemStorage implements IStorage {
     const announcement: Announcement = {
       ...insertAnnouncement,
       id,
+      summary: insertAnnouncement.summary || null,
+      imageUrl: insertAnnouncement.imageUrl || null,
+      priority: insertAnnouncement.priority || "normal",
+      isActive: insertAnnouncement.isActive ?? true,
+      publishedAt: insertAnnouncement.publishedAt || new Date(),
       createdAt: new Date(),
     };
     this.announcements.set(id, announcement);
@@ -339,7 +353,7 @@ export class MemStorage implements IStorage {
   async getNotificationsByCitizen(citizenId: number): Promise<Notification[]> {
     return Array.from(this.notifications.values())
       .filter(notification => notification.citizenId === citizenId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 
   async createNotification(insertNotification: InsertNotification): Promise<Notification> {
@@ -347,6 +361,9 @@ export class MemStorage implements IStorage {
     const notification: Notification = {
       ...insertNotification,
       id,
+      type: insertNotification.type || "info",
+      citizenId: insertNotification.citizenId || null,
+      isRead: insertNotification.isRead ?? false,
       createdAt: new Date(),
     };
     this.notifications.set(id, notification);

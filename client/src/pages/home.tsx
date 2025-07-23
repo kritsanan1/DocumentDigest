@@ -52,18 +52,18 @@ const quickServices = [
 export default function Home() {
   const [, setLocation] = useLocation();
 
-  const { data: services } = useQuery({
+  const { data: services } = useQuery<any[]>({
     queryKey: ["/api/services"],
-    select: (data) => data?.slice(0, 3) || [],
+    select: (data: any[]) => data?.slice(0, 3) || [],
   });
 
-  const { data: serviceStats } = useQuery({
+  const { data: serviceStats } = useQuery<any>({
     queryKey: ["/api/services/stats"],
   });
 
-  const { data: announcements } = useQuery({
+  const { data: announcements } = useQuery<any[]>({
     queryKey: ["/api/announcements"],
-    select: (data) => data?.slice(0, 2) || [],
+    select: (data: any[]) => data?.slice(0, 2) || [],
   });
 
   const containerVariants = {

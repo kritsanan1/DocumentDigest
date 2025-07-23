@@ -19,11 +19,11 @@ export default function Reports() {
   const [selectedYear, setSelectedYear] = useState("2024");
   const [selectedCategory, setSelectedCategory] = useState("all");
 
-  const { data: reports } = useQuery({
+  const { data: reports } = useQuery<any[]>({
     queryKey: ["/api/reports", selectedCategory !== "all" ? selectedCategory : undefined, parseInt(selectedYear)],
   });
 
-  const { data: serviceStats } = useQuery({
+  const { data: serviceStats } = useQuery<any>({
     queryKey: ["/api/services/stats"],
   });
 

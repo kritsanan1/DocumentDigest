@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
@@ -48,23 +48,27 @@ export default function Profile() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: citizen, isLoading } = useQuery({
+  const { data: citizen, isLoading } = useQuery<any>({
     queryKey: ["/api/citizens/current"],
-    onSuccess: (data) => {
-      setEditForm({
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        email: data.email || "",
-        address: data.address,
-      });
-    },
   });
 
-  const { data: services } = useQuery({
+  const { data: services } = useQuery<any[]>({
     queryKey: ["/api/services"],
-    select: (data) => data?.slice(0, 5) || [],
+    select: (data: any[]) => data?.slice(0, 5) || [],
   });
+
+  // Update form when citizen data is loaded
+  useEffect(() => {
+    if (citizen) {
+      setEditForm({
+        firstName: citizen.firstName,
+        lastName: citizen.lastName,
+        phone: citizen.phone,
+        email: citizen.email || "",
+        address: citizen.address,
+      });
+    }
+  }, [citizen]);
 
   const updateCitizenMutation = useMutation({
     mutationFn: async (updates: any) => {

@@ -10,13 +10,13 @@ export default function AppHeader() {
   const { theme, toggleTheme } = useTheme();
   const [language, setLanguage] = useState<"th" | "en">("th");
 
-  const { data: citizen } = useQuery({
+  const { data: citizen } = useQuery<any>({
     queryKey: ["/api/citizens/current"],
   });
 
-  const { data: notifications } = useQuery({
+  const { data: notifications } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
-    select: (data) => data?.filter((n: any) => !n.isRead) || [],
+    select: (data: any[]) => data?.filter((n: any) => !n.isRead) || [],
   });
 
   const toggleLanguage = () => {
@@ -78,9 +78,9 @@ export default function AppHeader() {
               className="glass-effect rounded-lg p-2 text-white hover:bg-white/20 relative"
             >
               <Bell className="w-4 h-4" />
-              {notifications?.length > 0 && (
+              {(notifications?.length || 0) > 0 && (
                 <Badge className="absolute -top-1 -right-1 w-5 h-5 text-xs bg-red-500 text-white border-none animate-pulse-soft">
-                  {notifications.length}
+                  {notifications?.length || 0}
                 </Badge>
               )}
             </Button>
@@ -101,9 +101,9 @@ export default function AppHeader() {
                   {language === "th" ? "ยินดีต้อนรับ" : "Welcome"}
                 </p>
                 <h2 className="text-lg font-semibold">
-                  {citizen.firstName} {citizen.lastName}
+                  {citizen?.firstName} {citizen?.lastName}
                 </h2>
-                <p className="text-xs opacity-75">ID: {citizen.thaiId}</p>
+                <p className="text-xs opacity-75">ID: {citizen?.thaiId}</p>
               </div>
             </div>
           </div>
