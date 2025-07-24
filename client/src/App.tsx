@@ -11,6 +11,7 @@ import Announcements from "@/pages/announcements";
 import Profile from "@/pages/profile";
 import Verification from "@/pages/verification";
 import Login from "@/pages/login";
+import Advanced from "@/pages/advanced";
 import AppHeader from "@/components/app-header";
 import BottomNavigation from "@/components/bottom-navigation";
 import FloatingActionButton from "@/components/floating-action-button";
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/profile" component={Profile} />
       <Route path="/verification" component={Verification} />
       <Route path="/login" component={Login} />
+      <Route path="/advanced" component={Advanced} />
       <Route component={NotFound} />
     </Switch>
   );
