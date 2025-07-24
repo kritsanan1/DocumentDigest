@@ -1,10 +1,11 @@
 import { 
-  citizens, services, reports, announcements, notifications,
+  citizens, services, reports, announcements, notifications, thaiIdVerifications,
   type Citizen, type InsertCitizen, 
   type Service, type InsertService,
   type Report, type InsertReport,
   type Announcement, type InsertAnnouncement,
-  type Notification, type InsertNotification
+  type Notification, type InsertNotification,
+  type ThaiIdVerification, type InsertThaiIdVerification
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -37,6 +38,12 @@ export interface IStorage {
   getNotificationsByCitizen(citizenId: number): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
   markNotificationAsRead(id: number): Promise<void>;
+
+  // Thai ID Verifications
+  getThaiIdVerification(requestId: string): Promise<ThaiIdVerification | undefined>;
+  getThaiIdVerificationHistory(citizenId: number): Promise<ThaiIdVerification[]>;
+  createThaiIdVerification(verification: InsertThaiIdVerification): Promise<ThaiIdVerification>;
+  updateThaiIdVerification(requestId: string, updates: Partial<ThaiIdVerification>): Promise<ThaiIdVerification | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -268,7 +275,7 @@ export class MemStorage implements IStorage {
       status: insertService.status || "pending",
       citizenId: insertService.citizenId || null,
       amount: insertService.amount || null,
-      documentUrls: insertService.documentUrls || null,
+      documentUrls: insertService.documentUrls || [],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -379,6 +386,23 @@ export class MemStorage implements IStorage {
       this.notifications.set(id, notification);
     }
   }
+
+  // Thai ID Verifications - Stub implementations for MemStorage
+  async getThaiIdVerification(_requestId: string): Promise<ThaiIdVerification | undefined> {
+    return undefined;
+  }
+
+  async getThaiIdVerificationHistory(_citizenId: number): Promise<ThaiIdVerification[]> {
+    return [];
+  }
+
+  async createThaiIdVerification(_verification: InsertThaiIdVerification): Promise<ThaiIdVerification> {
+    throw new Error("Thai ID verification not supported in memory storage");
+  }
+
+  async updateThaiIdVerification(_requestId: string, _updates: Partial<ThaiIdVerification>): Promise<ThaiIdVerification | undefined> {
+    return undefined;
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -470,17 +494,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getReports(category?: string, year?: number): Promise<Report[]> {
-    let query = db.select().from(reports);
-    
     if (category && year) {
-      query = query.where(and(eq(reports.category, category), eq(reports.year, year)));
+      return await db.select().from(reports)
+        .where(and(eq(reports.category, category), eq(reports.year, year)))
+        .orderBy(desc(reports.createdAt));
     } else if (category) {
-      query = query.where(eq(reports.category, category));
+      return await db.select().from(reports)
+        .where(eq(reports.category, category))
+        .orderBy(desc(reports.createdAt));
     } else if (year) {
-      query = query.where(eq(reports.year, year));
+      return await db.select().from(reports)
+        .where(eq(reports.year, year))
+        .orderBy(desc(reports.createdAt));
     }
     
-    return await query.orderBy(desc(reports.createdAt));
+    return await db.select().from(reports).orderBy(desc(reports.createdAt));
   }
 
   async createReport(insertReport: InsertReport): Promise<Report> {
@@ -492,19 +520,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAnnouncements(category?: string, limit?: number): Promise<Announcement[]> {
-    let query = db.select().from(announcements).where(eq(announcements.isActive, true));
-    
-    if (category) {
-      query = query.where(and(eq(announcements.isActive, true), eq(announcements.category, category)));
+    if (category && limit) {
+      return await db.select().from(announcements)
+        .where(and(eq(announcements.isActive, true), eq(announcements.category, category)))
+        .orderBy(desc(announcements.publishedAt))
+        .limit(limit);
+    } else if (category) {
+      return await db.select().from(announcements)
+        .where(and(eq(announcements.isActive, true), eq(announcements.category, category)))
+        .orderBy(desc(announcements.publishedAt));
+    } else if (limit) {
+      return await db.select().from(announcements)
+        .where(eq(announcements.isActive, true))
+        .orderBy(desc(announcements.publishedAt))
+        .limit(limit);
     }
     
-    query = query.orderBy(desc(announcements.publishedAt));
-    
-    if (limit) {
-      query = query.limit(limit);
-    }
-    
-    return await query;
+    return await db.select().from(announcements)
+      .where(eq(announcements.isActive, true))
+      .orderBy(desc(announcements.publishedAt));
   }
 
   async getAnnouncement(id: number): Promise<Announcement | undefined> {
@@ -541,6 +575,40 @@ export class DatabaseStorage implements IStorage {
       .update(notifications)
       .set({ isRead: true })
       .where(eq(notifications.id, id));
+  }
+
+  // Thai ID Verifications
+  async getThaiIdVerification(requestId: string): Promise<ThaiIdVerification | undefined> {
+    const [verification] = await db
+      .select()
+      .from(thaiIdVerifications)
+      .where(eq(thaiIdVerifications.requestId, requestId));
+    return verification || undefined;
+  }
+
+  async getThaiIdVerificationHistory(citizenId: number): Promise<ThaiIdVerification[]> {
+    return await db
+      .select()
+      .from(thaiIdVerifications)
+      .where(eq(thaiIdVerifications.citizenId, citizenId))
+      .orderBy(desc(thaiIdVerifications.createdAt));
+  }
+
+  async createThaiIdVerification(insertVerification: InsertThaiIdVerification): Promise<ThaiIdVerification> {
+    const [verification] = await db
+      .insert(thaiIdVerifications)
+      .values(insertVerification)
+      .returning();
+    return verification;
+  }
+
+  async updateThaiIdVerification(requestId: string, updates: Partial<ThaiIdVerification>): Promise<ThaiIdVerification | undefined> {
+    const [verification] = await db
+      .update(thaiIdVerifications)
+      .set(updates)
+      .where(eq(thaiIdVerifications.requestId, requestId))
+      .returning();
+    return verification || undefined;
   }
 }
 

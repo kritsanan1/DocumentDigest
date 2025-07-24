@@ -25,7 +25,9 @@ import {
   Camera,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  Shield,
+  QrCode
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -406,6 +408,44 @@ export default function Profile() {
                 className="text-xs bg-yellow-500/20 text-yellow-600 border-yellow-200 hover:bg-yellow-500/30"
               >
                 ตั้งค่า
+              </Button>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-blue-600" />
+                </div>
+                <span className="text-sm text-gray-800 dark:text-white">
+                  ยืนยันตัวตนดิจิทัล
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.location.href = '/verification'}
+                className="text-xs bg-blue-500/20 text-blue-600 border-blue-200 hover:bg-blue-500/30"
+              >
+                ยืนยัน
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center">
+                  <QrCode className="w-4 h-4 text-purple-600" />
+                </div>
+                <span className="text-sm text-gray-800 dark:text-white">
+                  QR Code สำหรับยืนยัน
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => toast({ title: "QR Code", description: "กำลังสร้าง QR Code สำหรับยืนยันตัวตน" })}
+                className="text-xs bg-purple-500/20 text-purple-600 border-purple-200 hover:bg-purple-500/30"
+              >
+                สร้าง
               </Button>
             </div>
           </div>

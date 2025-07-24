@@ -9,6 +9,7 @@ import Services from "@/pages/services";
 import Reports from "@/pages/reports";
 import Announcements from "@/pages/announcements";
 import Profile from "@/pages/profile";
+import Verification from "@/pages/verification";
 import AppHeader from "@/components/app-header";
 import BottomNavigation from "@/components/bottom-navigation";
 import FloatingActionButton from "@/components/floating-action-button";
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/reports" component={Reports} />
       <Route path="/announcements" component={Announcements} />
       <Route path="/profile" component={Profile} />
+      <Route path="/verification" component={Verification} />
       <Route component={NotFound} />
     </Switch>
   );

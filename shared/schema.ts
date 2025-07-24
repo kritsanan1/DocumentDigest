@@ -63,6 +63,24 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const thaiIdVerifications = pgTable("thai_id_verifications", {
+  id: serial("id").primaryKey(),
+  requestId: text("request_id").notNull().unique(),
+  citizenId: integer("citizen_id").references(() => citizens.id),
+  verificationMethod: text("verification_method").notNull(), // 'ndid', 'dopa', 'ekyc', 'thaid_app'
+  status: text("status").notNull().default("pending"), // 'pending', 'completed', 'failed', 'expired'
+  identityAssuranceLevel: text("identity_assurance_level").notNull().default("IAL1"), // 'IAL1', 'IAL2', 'IAL3'
+  verifiedData: jsonb("verified_data").$type<Record<string, any>>(),
+  biometricScore: integer("biometric_score"), // 0-100 score for biometric verification
+  blockchainHash: text("blockchain_hash"), // For NDID blockchain verification
+  dopaReferenceId: text("dopa_reference_id"), // For DOPA verification reference
+  transactionId: text("transaction_id"), // External service transaction ID
+  errorMessage: text("error_message"),
+  verifiedAt: timestamp("verified_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertCitizenSchema = createInsertSchema(citizens).omit({
   id: true,
@@ -91,6 +109,11 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true,
 });
 
+export const insertThaiIdVerificationSchema = createInsertSchema(thaiIdVerifications).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type Citizen = typeof citizens.$inferSelect;
 export type InsertCitizen = z.infer<typeof insertCitizenSchema>;
@@ -107,10 +130,14 @@ export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
+export type ThaiIdVerification = typeof thaiIdVerifications.$inferSelect;
+export type InsertThaiIdVerification = z.infer<typeof insertThaiIdVerificationSchema>;
+
 // Relations
 export const citizensRelations = relations(citizens, ({ many }) => ({
   services: many(services),
   notifications: many(notifications),
+  verifications: many(thaiIdVerifications),
 }));
 
 export const servicesRelations = relations(services, ({ one }) => ({
@@ -123,6 +150,13 @@ export const servicesRelations = relations(services, ({ one }) => ({
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   citizen: one(citizens, {
     fields: [notifications.citizenId],
+    references: [citizens.id],
+  }),
+}));
+
+export const thaiIdVerificationsRelations = relations(thaiIdVerifications, ({ one }) => ({
+  citizen: one(citizens, {
+    fields: [thaiIdVerifications.citizenId],
     references: [citizens.id],
   }),
 }));
