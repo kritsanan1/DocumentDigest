@@ -406,6 +406,30 @@ export class MemStorage implements IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Thai ID Verifications
+  async getThaiIdVerification(requestId: string): Promise<ThaiIdVerification | undefined> {
+    const [verification] = await db.select().from(thaiIdVerifications).where(eq(thaiIdVerifications.requestId, requestId));
+    return verification;
+  }
+
+  async getThaiIdVerificationHistory(citizenId: number): Promise<ThaiIdVerification[]> {
+    return await db.select().from(thaiIdVerifications)
+      .where(eq(thaiIdVerifications.citizenId, citizenId))
+      .orderBy(desc(thaiIdVerifications.createdAt));
+  }
+
+  async createThaiIdVerification(verification: InsertThaiIdVerification): Promise<ThaiIdVerification> {
+    const [newVerification] = await db.insert(thaiIdVerifications).values(verification).returning();
+    return newVerification;
+  }
+
+  async updateThaiIdVerification(requestId: string, updates: Partial<ThaiIdVerification>): Promise<ThaiIdVerification | undefined> {
+    const [updatedVerification] = await db.update(thaiIdVerifications)
+      .set(updates)
+      .where(eq(thaiIdVerifications.requestId, requestId))
+      .returning();
+    return updatedVerification;
+  }
   async getCitizen(id: number): Promise<Citizen | undefined> {
     const [citizen] = await db.select().from(citizens).where(eq(citizens.id, id));
     return citizen || undefined;

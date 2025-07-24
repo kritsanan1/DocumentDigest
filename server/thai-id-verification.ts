@@ -101,7 +101,7 @@ export class NDIDVerificationService {
         request_timeout: 300,
       };
 
-      const response = await fetch(`${this.baseUrl}/rp/requests/idp_response`, {
+      const response = await fetch(`${this.baseUrl}/rp/requests/citizen_id/${request.citizenData.citizenId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -125,7 +125,7 @@ export class NDIDVerificationService {
         metadata: {
           provider: 'NDID',
           transactionId: result.request_id,
-          blockchainHash: result.blockchain_hash,
+          blockchainHash: result.initial_salt,
         },
       };
     } catch (error) {
@@ -141,7 +141,7 @@ export class NDIDVerificationService {
 
   async checkVerificationStatus(requestId: string): Promise<VerificationResult> {
     try {
-      const response = await fetch(`${this.baseUrl}/rp/requests/${requestId}`, {
+      const response = await fetch(`${this.baseUrl}/rp/request_data/${requestId}`, {
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
           'X-Client-ID': this.clientId,
@@ -238,38 +238,29 @@ export class DOPAVerificationService {
 
       const result = await response.json();
 
-      if (result.status === 'verified') {
-        return {
-          success: true,
-          requestId: request.requestId,
-          method: 'dopa',
-          identityAssuranceLevel: 'IAL2',
-          verifiedData: {
-            citizenId: result.citizen_data.citizen_id,
-            firstName: result.citizen_data.first_name_th,
-            lastName: result.citizen_data.last_name_th,
-            dateOfBirth: result.citizen_data.date_of_birth,
-            address: result.citizen_data.address,
-            province: result.citizen_data.province,
-            district: result.citizen_data.district,
-            subDistrict: result.citizen_data.sub_district,
-            isVerified: true,
-            verificationTimestamp: new Date().toISOString(),
-          },
-          metadata: {
-            provider: 'DOPA',
-            transactionId: result.transaction_id,
-            dopaReferenceId: result.reference_id,
-          },
-        };
-      }
-
       return {
-        success: false,
+        success: result.verified === true,
         requestId: request.requestId,
         method: 'dopa',
-        identityAssuranceLevel: 'IAL1',
-        errors: [result.error_message || 'DOPA verification failed'],
+        identityAssuranceLevel: result.verification_level || 'IAL2',
+        verifiedData: result.verified ? {
+          citizenId: result.citizen_id,
+          firstName: result.first_name_th,
+          lastName: result.last_name_th,
+          dateOfBirth: result.date_of_birth,
+          address: result.address,
+          province: result.province,
+          district: result.district,
+          subDistrict: result.sub_district,
+          isVerified: true,
+          verificationTimestamp: new Date().toISOString(),
+        } : undefined,
+        metadata: {
+          provider: 'DOPA',
+          transactionId: result.transaction_id,
+          dopaReferenceId: result.reference_id,
+        },
+        errors: result.verified ? undefined : [result.error_message || 'DOPA verification failed'],
       };
     } catch (error) {
       return {
@@ -283,178 +274,232 @@ export class DOPAVerificationService {
   }
 }
 
-// eKYC Service Integration
-export class EKYCVerificationService {
+// ThaID App Integration via NDID SaaS
+export class ThaIDVerificationService {
   private apiKey: string;
+  private clientId: string;
   private baseUrl: string;
-  private provider: string;
 
   constructor() {
-    this.apiKey = process.env.EKYC_API_KEY || '';
-    this.baseUrl = process.env.EKYC_BASE_URL || 'https://api.iapp.co.th/ekyc/v1';
-    this.provider = process.env.EKYC_PROVIDER || 'iapp';
+    this.apiKey = process.env.THAID_API_KEY || '';
+    this.clientId = process.env.THAID_CLIENT_ID || '';
+    this.baseUrl = process.env.USE_SANDBOX === 'true' 
+      ? process.env.THAID_SANDBOX_URL || 'https://sandbox-thaid.ndid.co.th/v1'
+      : process.env.THAID_BASE_URL || 'https://thaid.ndid.co.th/v1';
   }
 
-  async verifyWithBiometric(request: VerificationRequest): Promise<VerificationResult> {
+  async verifyWithThaIDApp(request: VerificationRequest): Promise<VerificationResult> {
     try {
-      if (!this.apiKey || !request.biometricData) {
-        throw new Error('eKYC API credentials or biometric data not provided');
+      if (!this.apiKey) {
+        throw new Error('ThaID API credentials not configured');
       }
 
-      // eKYC API request with biometric verification
-      const ekycRequest = {
-        document_type: 'thai_national_id',
+      // ThaID App verification via NDID SaaS
+      const thaidRequest = {
         citizen_id: request.citizenData.citizenId,
-        face_image: request.biometricData.faceImage,
-        liveness_check: request.biometricData.livenessCheck,
-        anti_spoofing: request.biometricData.antiSpoofing,
-        verification_level: 'high',
         request_id: request.requestId,
+        callback_url: request.callbackUrl || `${process.env.BASE_URL}/api/auth/thaid/callback`,
+        service_name: 'อบต.วังสามหมอ Tour Der Wang',
+        purpose: 'การยืนยันตัวตนสำหรับใช้บริการท้องถิ่น',
+        data_request: {
+          first_name: true,
+          last_name: true,
+          date_of_birth: true,
+          address: true,
+          house_registration: true,
+        },
+        face_verification: request.biometricData ? {
+          face_image: request.biometricData.faceImage,
+          liveness_check: request.biometricData.livenessCheck,
+          anti_spoofing: request.biometricData.antiSpoofing,
+        } : undefined,
       };
 
-      const response = await fetch(`${this.baseUrl}/verify/biometric`, {
+      const response = await fetch(`${this.baseUrl}/verification/initiate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`,
+          'X-Client-ID': this.clientId,
         },
-        body: JSON.stringify(ekycRequest),
+        body: JSON.stringify(thaidRequest),
       });
 
       if (!response.ok) {
-        throw new Error(`eKYC API error: ${response.status} ${response.statusText}`);
+        throw new Error(`ThaID API error: ${response.status} ${response.statusText}`);
       }
 
       const result = await response.json();
 
-      if (result.verification_status === 'passed') {
+      return {
+        success: true,
+        requestId: request.requestId,
+        method: 'thaid_app',
+        identityAssuranceLevel: 'IAL3',
+        metadata: {
+          provider: 'ThaID',
+          transactionId: result.transaction_id,
+          blockchainHash: result.blockchain_hash,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        requestId: request.requestId,
+        method: 'thaid_app',
+        identityAssuranceLevel: 'IAL1',
+        errors: [error instanceof Error ? error.message : 'ThaID verification failed'],
+      };
+    }
+  }
+
+  async checkThaIDStatus(requestId: string): Promise<VerificationResult> {
+    try {
+      const response = await fetch(`${this.baseUrl}/verification/status/${requestId}`, {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'X-Client-ID': this.clientId,
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'completed' && result.verified) {
         return {
           success: true,
-          requestId: request.requestId,
-          method: 'ekyc',
-          identityAssuranceLevel: 'IAL2',
+          requestId,
+          method: 'thaid_app',
+          identityAssuranceLevel: 'IAL3',
           verifiedData: {
-            citizenId: result.extracted_data.citizen_id,
-            firstName: result.extracted_data.first_name_th,
-            lastName: result.extracted_data.last_name_th,
-            dateOfBirth: result.extracted_data.date_of_birth,
+            citizenId: result.data.citizen_id,
+            firstName: result.data.first_name_th,
+            lastName: result.data.last_name_th,
+            dateOfBirth: result.data.date_of_birth,
+            address: result.data.current_address,
+            province: result.data.province,
+            district: result.data.district,
+            subDistrict: result.data.sub_district,
             isVerified: true,
             verificationTimestamp: new Date().toISOString(),
           },
           biometricScore: result.biometric_score,
           metadata: {
-            provider: this.provider.toUpperCase(),
+            provider: 'ThaID',
             transactionId: result.transaction_id,
+            blockchainHash: result.blockchain_hash,
           },
         };
       }
 
       return {
         success: false,
-        requestId: request.requestId,
-        method: 'ekyc',
+        requestId,
+        method: 'thaid_app',
         identityAssuranceLevel: 'IAL1',
-        biometricScore: result.biometric_score,
-        errors: [result.error_message || 'eKYC biometric verification failed'],
+        errors: [result.error || 'ThaID verification pending or failed'],
       };
     } catch (error) {
       return {
         success: false,
-        requestId: request.requestId,
-        method: 'ekyc',
+        requestId,
+        method: 'thaid_app',
         identityAssuranceLevel: 'IAL1',
-        errors: [error instanceof Error ? error.message : 'eKYC verification failed'],
+        errors: [error instanceof Error ? error.message : 'ThaID status check failed'],
       };
     }
   }
 }
 
-// Main Verification Service Orchestrator
+// Main Thai ID Verification Service
 export class ThaiIdVerificationService {
   private ndidService: NDIDVerificationService;
   private dopaService: DOPAVerificationService;
-  private ekycService: EKYCVerificationService;
+  private thaidService: ThaIDVerificationService;
 
   constructor() {
     this.ndidService = new NDIDVerificationService();
     this.dopaService = new DOPAVerificationService();
-    this.ekycService = new EKYCVerificationService();
+    this.thaidService = new ThaIDVerificationService();
   }
 
   async verifyIdentity(request: VerificationRequest): Promise<VerificationResult> {
-    try {
-      switch (request.method) {
-        case 'ndid':
-          return await this.ndidService.initiateVerification(request);
-        
-        case 'dopa':
-          return await this.dopaService.verifyIdentity(request);
-        
-        case 'ekyc':
-          return await this.ekycService.verifyWithBiometric(request);
-        
-        case 'thaid_app':
-          // ThaID app deep linking - redirect to mobile app
-          return {
-            success: true,
-            requestId: request.requestId,
-            method: 'thaid_app',
-            identityAssuranceLevel: 'IAL2',
-            metadata: {
-              provider: 'ThaID',
-              transactionId: request.requestId,
-            },
-          };
-        
-        default:
-          throw new Error(`Unsupported verification method: ${request.method}`);
-      }
-    } catch (error) {
-      return {
-        success: false,
-        requestId: request.requestId,
-        method: request.method,
-        identityAssuranceLevel: 'IAL1',
-        errors: [error instanceof Error ? error.message : 'Verification failed'],
-      };
+    switch (request.method) {
+      case 'ndid':
+        return this.ndidService.initiateVerification(request);
+      case 'dopa':
+        return this.dopaService.verifyIdentity(request);
+      case 'thaid_app':
+        return this.thaidService.verifyWithThaIDApp(request);
+      case 'ekyc':
+        // eKYC integration would go here
+        return {
+          success: false,
+          requestId: request.requestId,
+          method: 'ekyc',
+          identityAssuranceLevel: 'IAL1',
+          errors: ['eKYC service not yet implemented'],
+        };
+      default:
+        return {
+          success: false,
+          requestId: request.requestId,
+          method: request.method,
+          identityAssuranceLevel: 'IAL1',
+          errors: ['Unsupported verification method'],
+        };
     }
   }
 
-  async getVerificationStatus(requestId: string, method: string): Promise<VerificationResult> {
+  async checkStatus(requestId: string, method: string): Promise<VerificationResult> {
     switch (method) {
       case 'ndid':
-        return await this.ndidService.checkVerificationStatus(requestId);
-      
+        return this.ndidService.checkVerificationStatus(requestId);
+      case 'thaid_app':
+        return this.thaidService.checkThaIDStatus(requestId);
+      case 'dopa':
+        // DOPA is typically synchronous, so we would just return the stored result
+        return {
+          success: false,
+          requestId,
+          method: 'dopa',
+          identityAssuranceLevel: 'IAL1',
+          errors: ['DOPA verification is synchronous - check database for results'],
+        };
       default:
         return {
           success: false,
           requestId,
           method,
           identityAssuranceLevel: 'IAL1',
-          errors: ['Status check not implemented for this method'],
+          errors: ['Unsupported verification method for status check'],
         };
     }
   }
 
+  // Helper method to generate ThaID deep link
   generateThaIdDeepLink(requestId: string, citizenId: string): string {
-    const appScheme = process.env.THAID_APP_SCHEME || 'thaid://';
+    const baseUrl = 'thaid://verify';
     const params = new URLSearchParams({
-      action: 'verify',
       request_id: requestId,
       citizen_id: citizenId,
+      service_name: 'อบต.วังสามหมอ',
       callback_url: `${process.env.BASE_URL}/api/auth/thaid/callback`,
     });
-    
-    return `${appScheme}verify?${params.toString()}`;
+    return `${baseUrl}?${params.toString()}`;
   }
 
-  generateQRCodeData(requestId: string, method: string): object {
-    return {
-      type: 'thai_id_verification',
+  // Helper method to generate QR code data
+  generateQRCodeData(requestId: string, method: string): string {
+    return JSON.stringify({
       request_id: requestId,
-      method,
-      expire_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 minutes
-      callback_url: `${process.env.BASE_URL}/api/auth/${method}/callback`,
-    };
+      verification_method: method,
+      service_name: 'อบต.วังสามหมอ Tour Der Wang',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Get verification status (unified method)
+  async getVerificationStatus(requestId: string, method: string): Promise<VerificationResult> {
+    return this.checkStatus(requestId, method);
   }
 }
