@@ -69,11 +69,19 @@ const ThaiIdVerification: React.FC = () => {
   // Initiate verification mutation
   const initiateVerification = useMutation({
     mutationFn: async (request: VerificationRequest) => {
-      const response = await apiRequest('/api/auth/thai-id/initiate', {
+      const response = await fetch('/api/auth/thai-id/initiate', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(request),
       });
-      return response;
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
     },
     onSuccess: (result: VerificationResult) => {
       setVerificationResult(result);
@@ -105,12 +113,21 @@ const ThaiIdVerification: React.FC = () => {
   // Generate ThaID deep link mutation
   const generateDeepLink = useMutation({
     mutationFn: async (data: { citizenId: string; requestId: string }) => {
-      return await apiRequest('/api/auth/thai-id/deeplink', {
+      const response = await fetch('/api/auth/thai-id/deeplink', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(data),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
     },
-    onSuccess: (result) => {
+    onSuccess: (result: any) => {
       if (result.deepLink) {
         window.location.href = result.deepLink;
       }

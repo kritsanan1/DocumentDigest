@@ -80,10 +80,19 @@ export default function LoginPage() {
 
   const verifyIdentityMutation = useMutation({
     mutationFn: async (requestData: any) => {
-      return await apiRequest('/api/auth/thai-id/initiate', {
+      const response = await fetch('/api/auth/thai-id/initiate', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(requestData),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
     },
     onSuccess: (result) => {
       setVerificationResult(result);

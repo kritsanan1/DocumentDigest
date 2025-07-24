@@ -338,7 +338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // For NDID, check real-time status
       if (verification.verificationMethod === 'ndid' && verification.status === 'pending') {
-        const result = await verificationService.getVerificationStatus(requestId, 'ndid');
+        const result = await verificationService.checkStatus(requestId, 'ndid');
         if (result.success && result.verifiedData) {
           await storage.updateThaiIdVerification(requestId, {
             status: 'completed',
